@@ -5,6 +5,7 @@
   import type {UICollapseState, UIDNSRecords} from '~/@types'
   import axios from 'axios'
   import {v4} from 'uuid'
+  import {watch} from 'vue'
   import NCollapse from '~/client/components/n-collapse.vue'
   let cardAOpen = $ref<boolean>(false)
   let cardCAAOpen = $ref<boolean>(false)
@@ -140,7 +141,23 @@
           if (validationResponse.data.apex) {
             domainCAAChecks.push(domainInput)
             checkNSRecords()
-            checkARecords()
+            const nsWatcher = watch(() => {
+              return domainNSState
+            }, () => {
+              nsWatcher()
+              switch (domainNSState) {
+                case 'invalid':
+                default:
+                  checkARecords()
+                  break
+                case 'valid':
+                  domainAState = 'skipped'
+                  break
+                case 'error':
+                  domainAState = 'error'
+                  break
+              }
+            })
             checkCAARecords()
           } else {
             domainInput.replace(`.${validationResponse.data.suffix}`, '').split('.').forEach((_partOfDomain, partOfDomainIndex, partOfDomainArray) => {
