@@ -1,0 +1,31 @@
+{
+  "dependencies": {
+    "@fastify/aws-lambda": "3.2.0",
+    "@netlify/functions": "1.4.0",
+    "@supabase/supabase-js": "2.4.1",
+    "@types/node": "18.11.18",
+    "@types/uuid": "9.0.0",
+    "@vitejs/plugin-vue": "4.0.0",
+    "axios": "1.2.5",
+    "dns-query": "0.11.2",
+    "fastify": "4.12.0",
+    "netlify-cli": "12.10.0",
+    "netlify-plugin-svg-sprite": "1.0.2",
+    "typescript": "4.9.4",
+    "unocss": "0.49.0",
+    "uuid": "^9.0.0",
+    "vite": "4.0.4",
+    "vite-plugin-html": "3.2.0",
+    "vue": "3.2.45",
+    "vue-tsc": "1.0.24"
+  },
+  "name": "netlify-dns-verifier",
+  "private": true,
+  "scripts": {
+    "build": "vue-tsc && vite build",
+    "dev": "vite dev",
+    "preview": "vite preview"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}

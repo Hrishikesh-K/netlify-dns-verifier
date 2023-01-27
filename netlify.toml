@@ -1,0 +1,17 @@
+[build]
+  command = "npm run build"
+  publish = "./dist/"
+[dev]
+  command = "npm run dev"
+  targetPort = 5173
+[functions."scheduled-update-db"]
+  schedule = "@weekly"
+[[plugins]]
+  package = "netlify-plugin-svg-sprite"
+  [plugins.inputs]
+    dist = "./src/assets/"
+[[redirects]]
+  force = true
+  from = "/api/*"
+  status = 200
+  to = "/.netlify/functions/api/:splat"

@@ -1,0 +1,9 @@
+.DS_Store
+.env
+.idea
+.netlify
+.vscode
+dist
+node_modules
+package-lock.json
+tsconfig.tsbuildinfo
