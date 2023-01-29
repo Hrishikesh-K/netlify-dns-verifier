@@ -14,16 +14,25 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
     const commonRouteOptions : RouteOptions = {
       attachValidation: true,
       errorHandler: (error, request, reply) => {
-        reply.status(error instanceof ApiError ? error.status : 500).send({
-          message: error.message,
-          request_id: request.awsLambda.context.awsRequestId
-        })
+        if (error instanceof ApiError) {
+          reply.status(error.status).send({
+            message: error.message,
+            request_id: request.awsLambda.context.awsRequestId,
+            stage: error.stage
+          })
+        } else {
+          reply.status(500).send({
+            message: 'Failed to process request because of an unhandled error',
+            request_id: request.awsLambda.context.awsRequestId,
+            stage: 'unknown'
+          })
+        }
       },
       handler: () => {},
       method: 'GET',
       preHandler: (request, _reply, next) => {
         if (request.validationError) {
-          throw new ApiError('Failed to process request because it contains invalid data', 400)
+          throw new ApiError('Failed to process request because it contains invalid data', 'params_validation', 400)
         } else {
           next()
         }

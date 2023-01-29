@@ -11,13 +11,15 @@
     open : boolean
     state : UICollapseState
     title : string
+    text? : string
   }>(), {
     dns: () => {
       return []
     },
     open: false,
     state: 'waiting',
-    title: ''
+    title: '',
+    text: ''
   })
   let collapseData = $computed<{
     color : string
@@ -131,7 +133,7 @@
       <p
         u-m="0"
         u-p="l-3 y-3"
-        v-else>{{collapseData.text}}</p>
+        v-else>{{collapseProps.text || collapseData.text}}</p>
     </div>
   </div>
 </template>

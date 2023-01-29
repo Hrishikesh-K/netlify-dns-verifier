@@ -19,11 +19,21 @@
   let domainCAAChecks = $ref<Array<string>>([])
   let domainCAARecords = $ref<UIDNSRecords>([])
   let domainCAAState = $ref<UICollapseState>('waiting')
+  let domainCAAText = $ref<string>('')
   let domainCNAMERecords = $ref<UIDNSRecords>([])
   let domainCNAMEState = $ref<UICollapseState>('waiting')
   let domainInput = $ref<string>('')
   let domainNSRecords = $ref<UIDNSRecords>([])
   let domainNSState = $ref<UICollapseState>('waiting')
+  type AxiosResponseError = {
+    response? : {
+      data : {
+        message : string
+        request_id : string
+        stage : string
+      }
+    }
+  }
   function checkARecords() {
     domainAState = 'checking'
     axios({
@@ -83,8 +93,13 @@
       } else {
         domainAAAAState = 'invalid'
       }
-    }, aaaaResponseError => {
+    }, (aaaaResponseError : AxiosResponseError) => {
       domainAAAAState = 'error'
+      if (aaaaResponseError.response && aaaaResponseError.response.data.stage === 'dns_class_validation') {
+        domainCAAText = aaaaResponseError.response.data.message
+      } else {
+        console.log(aaaaResponseError)
+      }
       console.log(aaaaResponseError)
     })
   }
@@ -111,8 +126,12 @@
             resolve()
           }
           return caaResponse.data.caa.length === 0
-        }, caaResponseError => {
-          console.log(caaResponseError)
+        }, (caaResponseError : AxiosResponseError) => {
+          if (caaResponseError.response && caaResponseError.response.data.stage === 'dns_class_validation') {
+            domainCAAText = caaResponseError.response.data.message
+          } else {
+            console.log(caaResponseError)
+          }
           reject()
           return false
         })
@@ -204,6 +223,7 @@
     domainCAAState = 'waiting'
     domainCNAMERecords = []
     domainCNAMEState = 'waiting'
+    domainCAAText = ''
     domainNSRecords = []
     domainNSState = 'waiting'
     if (domainInput.length > 0) {
@@ -242,6 +262,18 @@
           domainError = 'Invalid domain'
           domainNSState = 'skipped'
         }
+      }, (validationResponseError : AxiosResponseError) => {
+        if (validationResponseError.response && validationResponseError.response.data.stage === 'params_validation') {
+          domainError = 'The provided string doesn\'t look like a domain'
+        } else {
+          domainError = 'Something went wrong while validating the domain'
+          console.log(validationResponseError)
+        }
+        domainAState = 'skipped'
+        domainAAAAState = 'skipped'
+        domainCAAState = 'skipped'
+        domainCNAMEState = 'skipped'
+        domainNSState = 'skipped'
       })
     } else {
       domainAState = 'skipped'
@@ -309,6 +341,7 @@
         v-bind:dns="domainCAARecords"
         v-bind:open="cardCAAOpen"
         v-bind:state="domainCAAState"
+        v-bind:text="domainCAAText"
         v-on:toggle="cardCAAOpen = $event"/>
       <NCollapse
         title="CNAME Records"

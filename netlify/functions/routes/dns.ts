@@ -10,7 +10,7 @@ export default function (request : FastifyRequest<{
     domain : string
   }
 }>, reply : FastifyReply) {
-  query({
+  return query({
     question: {
       name: request.params.domain,
       type: request.params.class.toUpperCase()
@@ -24,10 +24,12 @@ export default function (request : FastifyRequest<{
         value : string
       }>
     } = {}
+    let receivedClass : string = ''
     if ((dnsResponse.answers as Exclude<Packet['answers'], undefined>).some(dnsRecord => {
-      return dnsRecord.type.toLowerCase() !== request.params.class
+      receivedClass = dnsRecord.type
+      return dnsRecord.type !== request.params.class.toUpperCase()
     })) {
-      throw new ApiError('DNS response contains invalid data')
+      throw new ApiError(`Requested ${request.params.class.toUpperCase()} but received ${receivedClass} response`, 'dns_class_validation', 400)
     } else {
       if (request.params.class === 'a' || request.params.class === 'aaaa') {
         records[request.params.class] = (dnsResponse.answers as Exclude<Packet['answers'], undefined>).map(record => {
@@ -38,9 +40,6 @@ export default function (request : FastifyRequest<{
         })
       } else {
         records[request.params.class] = dnsResponse.answers
-        if (request.params.class === 'caa') {
-          console.log(request)
-        }
       }
       reply.status(200).send(records)
     }
