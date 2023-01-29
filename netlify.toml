@@ -4,12 +4,14 @@
 [dev]
   command = "npm run dev"
   targetPort = 5173
-[functions."scheduled-update-db"]
-  schedule = "@weekly"
+#[functions."scheduled-update-db"]
+  #schedule = "@daily"
 [[plugins]]
   package = "netlify-plugin-svg-sprite"
   [plugins.inputs]
     dist = "./src/assets/"
+[[plugins]]
+  package = "./netlify/plugins/netlify-plugin-update-db"
 [[redirects]]
   force = true
   from = "/api/*"

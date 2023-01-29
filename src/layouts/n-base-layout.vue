@@ -5,17 +5,22 @@
   import type {UICollapseState, UIDNSRecords} from '~/@types'
   import axios from 'axios'
   import {v4} from 'uuid'
-  import {watch} from 'vue'
   import NCollapse from '~/client/components/n-collapse.vue'
   let cardAOpen = $ref<boolean>(false)
+  let cardAAAAOpen = $ref<boolean>(false)
   let cardCAAOpen = $ref<boolean>(false)
+  let cardCNAMEOpen = $ref<boolean>(false)
   let cardNSOpen = $ref<boolean>(false)
   let domainARecords = $ref<UIDNSRecords>([])
   let domainAState = $ref<UICollapseState>('waiting')
+  let domainAAAARecords = $ref<UIDNSRecords>([])
+  let domainAAAAState = $ref<UICollapseState>('waiting')
   let domainError = $ref<string>('')
   let domainCAAChecks = $ref<Array<string>>([])
   let domainCAARecords = $ref<UIDNSRecords>([])
   let domainCAAState = $ref<UICollapseState>('waiting')
+  let domainCNAMERecords = $ref<UIDNSRecords>([])
+  let domainCNAMEState = $ref<UICollapseState>('waiting')
   let domainInput = $ref<string>('')
   let domainNSRecords = $ref<UIDNSRecords>([])
   let domainNSState = $ref<UICollapseState>('waiting')
@@ -25,18 +30,21 @@
       url: `/api/dns/a/${domainInput}`
     }).then((aResponse: {
       data : {
-        a : Exclude<Packet['answers'], undefined>
+        records : Array<{
+          valid : boolean
+          value : string
+        }>
       }
     }) => {
-      aResponse.data.a.forEach(aRecord => {
+      aResponse.data.records.forEach(aRecord => {
         domainARecords.push({
           id: v4(),
           domain: domainInput,
-          valid: /75\.2\.60\.5|99\.83\.231\.61/.test(aRecord.data as string),
-          value: aRecord.data as string
+          valid: aRecord.valid,
+          value: aRecord.value
         })
       })
-      if (domainARecords.every(aRecord => {
+      if (domainARecords.length > 0 && domainARecords.length < 3 && domainARecords.every(aRecord => {
         return aRecord.valid
       })) {
         domainAState = 'valid'
@@ -46,6 +54,38 @@
     }, aResponseError => {
       domainAState = 'error'
       console.log(aResponseError)
+    })
+  }
+  function checkAAAARecords() {
+    domainAAAAState = 'checking'
+    axios({
+      url: `/api/dns/aaaa/${domainInput}`
+    }).then((aaaaResponse : {
+      data : {
+        records : Array<{
+          valid : boolean
+          value : string
+        }>
+      }
+    }) => {
+        aaaaResponse.data.records.forEach(aaaaRecord => {
+          domainAAAARecords.push({
+            id: v4(),
+            domain: domainInput,
+            valid: aaaaRecord.valid,
+            value: aaaaRecord.value
+          })
+        })
+      if (domainAAAARecords.length < 3 && domainAAAARecords.every(aaaaRecord => {
+        return aaaaRecord.valid
+      })) {
+        domainAAAAState = 'valid'
+      } else {
+        domainAAAAState = 'invalid'
+      }
+    }, aaaaResponseError => {
+      domainAAAAState = 'error'
+      console.log(aaaaResponseError)
     })
   }
   function checkCAARecords() {
@@ -89,6 +129,41 @@
       domainCAAState = 'error'
     })
   }
+  function checkCNAMERecords(apex? : boolean) {
+    domainCNAMEState = 'checking'
+    let domainToCheck = ''
+    if (apex) {
+      domainToCheck = `www.${domainInput}`
+    } else {
+      domainToCheck = domainInput
+    }
+    axios({
+      url: `/api/dns/cname/${domainToCheck}`
+    }).then((cnameResponse : {
+      data : {
+        cname : Exclude<Packet['answers'], undefined>
+      }
+    }) => {
+      cnameResponse.data.cname.forEach(cnameRecord => {
+        domainCNAMERecords.push({
+          id: v4(),
+          domain: domainToCheck,
+          valid: (cnameRecord.data as string).endsWith('.netlify.app'),
+          value: cnameRecord.data as string
+        })
+      })
+      if (domainCNAMERecords.length > 0 && domainCNAMERecords.every(cnameRecord => {
+        return cnameRecord.valid
+      })) {
+        domainCNAMEState = 'valid'
+      } else {
+        domainCNAMEState = 'invalid'
+      }
+    }, cnameResponseError => {
+      domainCNAMEState = 'error'
+      console.log(cnameResponseError)
+    })
+  }
   function checkNSRecords() {
     domainNSState = 'checking'
     axios({
@@ -106,7 +181,7 @@
           value: nsRecord.data as string
         })
       })
-      if (domainNSRecords.every(nsRecord => {
+      if (domainNSRecords.length === 4 && domainNSRecords.every(nsRecord => {
         return nsRecord.valid
       })) {
         domainNSState = 'valid'
@@ -122,9 +197,13 @@
     domainError = ''
     domainARecords = []
     domainAState = 'waiting'
+    domainAAAARecords = []
+    domainAAAAState = 'waiting'
     domainCAAChecks = []
     domainCAARecords = []
     domainCAAState = 'waiting'
+    domainCNAMERecords = []
+    domainCNAMEState = 'waiting'
     domainNSRecords = []
     domainNSState = 'waiting'
     if (domainInput.length > 0) {
@@ -141,40 +220,33 @@
           if (validationResponse.data.apex) {
             domainCAAChecks.push(domainInput)
             checkNSRecords()
-            const nsWatcher = watch(() => {
-              return domainNSState
-            }, () => {
-              nsWatcher()
-              switch (domainNSState) {
-                case 'invalid':
-                default:
-                  checkARecords()
-                  break
-                case 'valid':
-                  domainAState = 'skipped'
-                  break
-                case 'error':
-                  domainAState = 'error'
-                  break
-              }
-            })
+            checkARecords()
+            checkAAAARecords()
             checkCAARecords()
           } else {
+            domainAState = 'skipped'
+            domainAAAAState = 'skipped'
+            checkNSRecords()
             domainInput.replace(`.${validationResponse.data.suffix}`, '').split('.').forEach((_partOfDomain, partOfDomainIndex, partOfDomainArray) => {
               domainCAAChecks.push(`${partOfDomainArray.slice(partOfDomainIndex).join('.')}.${validationResponse.data.suffix}`)
             })
             checkCAARecords()
+            checkCNAMERecords()
           }
         } else {
           domainAState = 'skipped'
+          domainAAAAState = 'skipped'
           domainCAAState = 'skipped'
+          domainCNAMEState = 'skipped'
           domainError = 'Invalid domain'
           domainNSState = 'skipped'
         }
       })
     } else {
       domainAState = 'skipped'
+      domainAAAAState = 'skipped'
       domainCAAState = 'skipped'
+      domainCNAMEState = 'skipped'
       domainError = 'Please enter a domain'
       domainNSState = 'skipped'
     }
@@ -220,23 +292,35 @@
       u-border="rounded-lg"
       u-m="t-6">
       <NCollapse
-        title="NS Records"
-        v-bind:dns="domainNSRecords"
-        v-bind:open="cardNSOpen"
-        v-bind:state="domainNSState"
-        v-on:toggle="cardNSOpen = $event"/>
-      <NCollapse
         title="A Records"
         v-bind:dns="domainARecords"
         v-bind:open="cardAOpen"
         v-bind:state="domainAState"
         v-on:toggle="cardAOpen = $event"/>
       <NCollapse
+        title="AAAA Records"
+        v-bind:dns="domainAAAARecords"
+        v-bind:open="cardAAAAOpen"
+        v-bind:state="domainAAAAState"
+        v-on:toggle="cardAAAAOpen = $event"/>
+      <NCollapse
         title="CAA Records"
         v-bind:dns="domainCAARecords"
         v-bind:open="cardCAAOpen"
         v-bind:state="domainCAAState"
         v-on:toggle="cardCAAOpen = $event"/>
+      <NCollapse
+        title="CNAME Records"
+        v-bind:dns="domainCNAMERecords"
+        v-bind:open="cardCNAMEOpen"
+        v-bind:state="domainCNAMEState"
+        v-on:toggle="cardCNAMEOpen = $event"/>
+      <NCollapse
+        title="NS Records"
+        v-bind:dns="domainNSRecords"
+        v-bind:open="cardNSOpen"
+        v-bind:state="domainNSState"
+        v-on:toggle="cardNSOpen = $event"/>
     </div>
   </main>
 </template>

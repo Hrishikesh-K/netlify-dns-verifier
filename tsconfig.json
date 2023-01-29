@@ -28,11 +28,12 @@
       "~/server/*": ["./netlify/functions/*"]
     },
     "removeComments": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
     "target": "ESNext",
     "typeRoots": ["./@types", "./node_modules/@types"]
   },
-  "include": ["./netlify/**/*.ts", "./src/**/*.ts", "./src/**/*.d.ts", "./src/**/*.vue", "./uno.config.ts", "./vite.config.ts"]
+  "include": ["./netlify/**/*.json", "./netlify/**/*.ts", "./src/**/*.d.ts", "./src/**/*.ts", "./src/**/*.vue" ,"./uno.config.ts", "./vite.config.ts"]
 }
