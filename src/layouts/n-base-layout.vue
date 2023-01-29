@@ -5,7 +5,6 @@
   import type {UICollapseState, UIDNSRecords} from '~/@types'
   import axios from 'axios'
   import {v4} from 'uuid'
-  import {watch} from 'vue'
   import NCollapse from '~/client/components/n-collapse.vue'
   let cardAOpen = $ref<boolean>(false)
   let cardAAAAOpen = $ref<boolean>(false)
@@ -31,13 +30,13 @@
       url: `/api/dns/a/${domainInput}`
     }).then((aResponse: {
       data : {
-        records : Array<{
+        a : Array<{
           valid : boolean
           value : string
         }>
       }
     }) => {
-      aResponse.data.records.forEach(aRecord => {
+      aResponse.data.a.forEach(aRecord => {
         domainARecords.push({
           id: v4(),
           domain: domainInput,
@@ -63,13 +62,13 @@
       url: `/api/dns/aaaa/${domainInput}`
     }).then((aaaaResponse : {
       data : {
-        records : Array<{
+        aaaa : Array<{
           valid : boolean
           value : string
         }>
       }
     }) => {
-        aaaaResponse.data.records.forEach(aaaaRecord => {
+        aaaaResponse.data.aaaa.forEach(aaaaRecord => {
           domainAAAARecords.push({
             id: v4(),
             domain: domainInput,
@@ -220,24 +219,11 @@
         if (validationResponse.data.valid) {
           if (validationResponse.data.apex) {
             domainCAAChecks.push(domainInput)
-            checkNSRecords()
             checkARecords()
             checkAAAARecords()
             checkCAARecords()
-            const dnsWatcher = watch([() => {
-              return domainAState
-            }, () => {
-              return domainAAAAState
-            }, () => {
-              return domainNSState
-            }], () => {
-              if (domainAState === 'valid' && domainAAAAState === 'valid' && domainNSState !== 'valid') {
-                checkCNAMERecords(true)
-                dnsWatcher()
-              } else {
-                domainCNAMEState = 'skipped'
-              }
-            })
+            checkCNAMERecords(true)
+            checkNSRecords()
           } else {
             domainAState = 'skipped'
             domainAAAAState = 'skipped'

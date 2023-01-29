@@ -1,4 +1,4 @@
-import type {Packet} from '@leichtgewicht/dns-packet'
+import type {CaaAnswer, DSAnswer, Packet} from '@leichtgewicht/dns-packet'
 import type {FastifyReply, FastifyRequest} from 'fastify'
 import {query} from 'dns-query'
 import {ApiError} from '~/server/data/constants'
@@ -19,19 +19,21 @@ export default function (request : FastifyRequest<{
     endpoints: ['dns.google']
   }).then(dnsResponse => {
     const records : {
-      [key in DNSClass]? : Packet['answers']
+      [key in DNSClass]? : Array<CaaAnswer> | Array<DSAnswer> | Packet['answers'] | Array<{
+        valid : boolean
+        value : string
+      }>
     } = {}
-    records[request.params.class] = dnsResponse.answers
     if (request.params.class === 'a' || request.params.class === 'aaaa') {
-      reply.status(200).send({
-        records: (records[request.params.class] as Exclude<Packet['answers'], undefined>).map(record => {
-          return {
-            valid: ips.includes(record.data as string),
-            value: record.data
-          }
-        })
+      records[request.params.class] = (dnsResponse.answers as Exclude<Packet['answers'], undefined>).map(record => {
+        return {
+          valid: ips.includes(record.data as string),
+          value: record.data as string
+        }
       })
+      reply.status(200).send(records)
     } else {
+      records[request.params.class] = dnsResponse.answers
       reply.status(200).send(records)
     }
   }, () => {
