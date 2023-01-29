@@ -5,6 +5,7 @@
   import type {UICollapseState, UIDNSRecords} from '~/@types'
   import axios from 'axios'
   import {v4} from 'uuid'
+  import {watch} from 'vue'
   import NCollapse from '~/client/components/n-collapse.vue'
   let cardAOpen = $ref<boolean>(false)
   let cardAAAAOpen = $ref<boolean>(false)
@@ -223,6 +224,20 @@
             checkARecords()
             checkAAAARecords()
             checkCAARecords()
+            const dnsWatcher = watch([() => {
+              return domainAState
+            }, () => {
+              return domainAAAAState
+            }, () => {
+              return domainNSState
+            }], () => {
+              if (domainAState === 'valid' && domainAAAAState === 'valid' && domainNSState !== 'valid') {
+                checkCNAMERecords(true)
+                dnsWatcher()
+              } else {
+                domainCNAMEState = 'skipped'
+              }
+            })
           } else {
             domainAState = 'skipped'
             domainAAAAState = 'skipped'

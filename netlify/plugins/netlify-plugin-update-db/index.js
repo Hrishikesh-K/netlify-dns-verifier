@@ -23,6 +23,7 @@ function updateFiles(plugin) {
       ips.push(ipMatch[0])
     }
     writeFileSync(ipPath, JSON.stringify(ips))
+    console.log('IPs updated')
   }, githubResponseError => {
     plugin.utils.build.failBuild('Failed to fetch data from GitHub', {
       error: githubResponseError
@@ -39,6 +40,7 @@ function updateFiles(plugin) {
         return line.length > 0 && !line.startsWith('//')
       }
     })))
+    console.log('Suffixes updated')
   }, listResponseError => {
     plugin.utils.build.failBuild('Failed to fetch data from MDN', {
       error: listResponseError
