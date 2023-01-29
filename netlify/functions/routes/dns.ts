@@ -24,16 +24,24 @@ export default function (request : FastifyRequest<{
         value : string
       }>
     } = {}
-    if (request.params.class === 'a' || request.params.class === 'aaaa') {
-      records[request.params.class] = (dnsResponse.answers as Exclude<Packet['answers'], undefined>).map(record => {
-        return {
-          valid: ips.includes(record.data as string),
-          value: record.data as string
-        }
-      })
-      reply.status(200).send(records)
+    if ((dnsResponse.answers as Exclude<Packet['answers'], undefined>).some(dnsRecord => {
+      return dnsRecord.type.toLowerCase() !== request.params.class
+    })) {
+      throw new ApiError('DNS response contains invalid data')
     } else {
-      records[request.params.class] = dnsResponse.answers
+      if (request.params.class === 'a' || request.params.class === 'aaaa') {
+        records[request.params.class] = (dnsResponse.answers as Exclude<Packet['answers'], undefined>).map(record => {
+          return {
+            valid: ips.includes(record.data as string),
+            value: record.data as string
+          }
+        })
+      } else {
+        records[request.params.class] = dnsResponse.answers
+        if (request.params.class === 'caa') {
+          console.log(request)
+        }
+      }
       reply.status(200).send(records)
     }
   }, () => {
