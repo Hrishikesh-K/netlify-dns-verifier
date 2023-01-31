@@ -8,4 +8,5 @@ netlify/functions/data/ips.json
 netlify/functions/data/suffixes.json
 node_modules
 package-lock.json
+src/assets/sprites.svg
 tsconfig.tsbuildinfo

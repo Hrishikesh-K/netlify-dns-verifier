@@ -1,7 +1,12 @@
-export type UICollapseState = 'checking' | 'error' | 'invalid' | 'skipped' | 'valid' | 'waiting'
-export type UIDNSRecords = Array<{
-  id : string
-  domain : string
+import type {DigestData} from '@leichtgewicht/dns-packet'
+export type DNSResponse ={
+  [key in 'A' | 'AAAA' | 'CAA' | 'CNAME' | 'DS' | 'NS']? : Array<{
+    id : string
+    domain : string
+    valid : boolean
+    value : boolean | DigestData | string
+  }>
+} & {
   valid : boolean
-  value : string
-}>
+}
+export type UICollapseState = 'checking' | 'error' | 'invalid' | 'skipped' | 'valid' | 'waiting'

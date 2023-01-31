@@ -3,7 +3,6 @@ import type {RouteOptions} from 'fastify'
 import awsLambdaFastify from '@fastify/aws-lambda'
 import fastify from 'fastify'
 import {ApiError} from '~/server/data/constants'
-import dns from '~/server/routes/dns'
 import validate from '~/server/routes/validate'
 export async function handler(event : HandlerEvent, context : HandlerContext) {
   const api = fastify({
@@ -21,6 +20,7 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
             stage: error.stage
           })
         } else {
+          console.log(error)
           reply.status(500).send({
             message: 'Failed to process request because of an unhandled error',
             request_id: request.awsLambda.context.awsRequestId,
@@ -40,10 +40,6 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
       schema: {
         params: {
           properties: {
-            class: {
-              enum: ['a', 'aaaa', 'caa', 'cname', 'ds', 'ns'],
-              type: 'string'
-            },
             domain: {
               pattern: '^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$',
               type: 'string'
@@ -54,11 +50,6 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
       },
       url: ''
     }
-    app.route({
-      ...commonRouteOptions,
-      handler: dns,
-      url: '/dns/:class/:domain'
-    })
     app.route({
       ...commonRouteOptions,
       handler: validate,

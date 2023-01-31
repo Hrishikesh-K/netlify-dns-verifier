@@ -1,13 +1,13 @@
 <script
   setup
   lang="ts">
-  import type {UICollapseState, UIDNSRecords} from '~/@types'
+  import type {DNSResponse, UICollapseState} from '~/@types'
   import NIcon from '~/client/components/n-icon.vue'
   const collapseEmits = defineEmits<{
     (event: 'toggle', value : boolean): void
   }>()
   const collapseProps = withDefaults(defineProps<{
-    dns : UIDNSRecords
+    dns : DNSResponse['A'] | DNSResponse['AAAA'] | DNSResponse['CAA'] | DNSResponse['CNAME'] | DNSResponse['DS'] | DNSResponse['NS']
     open : boolean
     state : UICollapseState
     title : string
