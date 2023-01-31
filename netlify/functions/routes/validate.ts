@@ -20,6 +20,7 @@ export default function (request : FastifyRequest<{
       return currentDomain
     }
   }, '')
+  const apexDomain = request.params.domain.split('.').length - actualSuffix.split('.').length === 1
   if (filteredSuffixes.length > 0) {
     return Promise.all(['A', 'AAAA', 'CAA', 'CNAME', 'DS', 'NS'].map(dnsClass => {
       if (dnsClass === 'CAA') {
@@ -47,7 +48,7 @@ export default function (request : FastifyRequest<{
             CAA: []
           })
         })
-      } else if (!request.params.domain.startsWith('www.') && actualSuffix !== request.params.domain && dnsClass === 'CNAME') {
+      } else if (!request.params.domain.startsWith('www.') && apexDomain && dnsClass === 'CNAME') {
         return Promise.all([`www.${request.params.domain}`, request.params.domain].map(domain => {
           return query({
             question: {
@@ -86,64 +87,137 @@ export default function (request : FastifyRequest<{
       }
     })).then(dnsResponses => {
       const dns : DNSResponse = {
+        A: {
+          records: [],
+          text: '',
+          valid: false
+        },
+        AAAA: {
+          records: [],
+          text: '',
+          valid: false
+        },
+        CAA: {
+          records: [],
+          text: '',
+          valid: false
+        },
+        CNAME: {
+          records: [],
+          text: '',
+          valid: false
+        },
+        DS: {
+          records: [],
+          text: '',
+          valid: false
+        },
+        NS: {
+          records: [],
+          text: '',
+          valid: false
+        },
         valid: true
       }
       dnsResponses.map(dnsResponse => {
         Object.keys(dnsResponse).forEach(dnsClass => {
           switch (dnsClass) {
             case 'A':
-            case 'AAAA':
-              dns[dnsClass] = dnsResponse[dnsClass]!.map(dnsAnswer => {
+              dns['A'].records = dnsResponse[dnsClass]!.map(aAnswer => {
                 return {
                   id: v4(),
-                  domain: dnsAnswer.name,
-                  valid: (dnsAnswer.type === 'A' || dnsAnswer.type === 'AAAA') && ips.includes(dnsAnswer.data as string),
-                  value: (dnsAnswer.type === 'A' || dnsAnswer.type === 'AAAA') && dnsAnswer.data as string
+                  domain: aAnswer.name,
+                  valid: aAnswer.type === 'A' && ips.includes(aAnswer.data as string),
+                  value: aAnswer.type === 'A' && aAnswer.data as string
                 }
               })
+              if (dns['A'].records.length > 0 && dns['A'].records.length < 3 && dns['A'].records.every(aRecord => {
+                return aRecord.valid
+              })) {
+                dns['A'].valid = true
+              }
+              break
+            case 'AAAA':
+              dns[dnsClass].records = dnsResponse[dnsClass]!.map(aaaaAnswer => {
+                return {
+                  id: v4(),
+                  domain: aaaaAnswer.name,
+                  valid: aaaaAnswer.type === 'AAAA' && ips.includes(aaaaAnswer.data as string),
+                  value: aaaaAnswer.type === 'AAAA' && aaaaAnswer.data as string
+                }
+              })
+              if (dns['AAAA'].records.length === 0 || (dns['AAAA'].records.length < 3 && dns['AAAA'].records.every(aaaaRecord => {
+                return aaaaRecord.valid
+              }))) {
+                dns['AAAA'].valid = true
+              }
               break
             case 'CAA':
-              dns['CAA'] = (dnsResponse['CAA'] as Array<CaaAnswer>).map(dnsAnswer => {
+              dns['CAA'].records = (dnsResponse['CAA'] as Array<CaaAnswer>).map(caaAnswer => {
                 return {
                   id: v4(),
-                  domain: dnsAnswer.name,
-                  valid: dnsAnswer.type === 'CAA' && dnsAnswer.data.flags === 0 && dnsAnswer.data.tag === 'issue' && dnsAnswer.data.value === 'letsencrypt.org',
-                  value: dnsAnswer.type === 'CAA' && `${dnsAnswer.data.flags} ${dnsAnswer.data.tag} "${dnsAnswer.data.value}"`
+                  domain: caaAnswer.name,
+                  valid: caaAnswer.type === 'CAA' && caaAnswer.data.flags === 0 && caaAnswer.data.tag === 'issue' && caaAnswer.data.value === 'letsencrypt.org',
+                  value: caaAnswer.type === 'CAA' && `${caaAnswer.data.flags} ${caaAnswer.data.tag} "${caaAnswer.data.value}"`
                 }
               })
+              if (dns['CAA'].records.length === 0 || dns['CAA'].records.some(caaRecord => {
+                return caaRecord.valid
+              })) {
+                dns['CAA'].valid = true
+              }
               break
             case 'CNAME':
-              dns['CNAME'] = dnsResponse['CNAME']!.map(dnsAnswer => {
+              dns['CNAME'].records = dnsResponse['CNAME']!.map(cnameAnswer => {
                 return {
                   id: v4(),
-                  domain: dnsAnswer.name,
-                  valid: dnsAnswer.type === 'CNAME' && (dnsAnswer.data as string).endsWith('.netlify.app'),
-                  value: dnsAnswer.type === 'CNAME' && dnsAnswer.data as string
+                  domain: cnameAnswer.name,
+                  valid: cnameAnswer.type === 'CNAME' && (cnameAnswer.data as string).endsWith('.netlify.app'),
+                  value: cnameAnswer.type === 'CNAME' && cnameAnswer.data as string
                 }
               })
+              if (apexDomain && dns['CNAME'].records.length === 0) {
+                dns['CNAME'].valid = true
+              } else if (!apexDomain && dns['CNAME'].records.length === 1 && dns['CNAME'].records.every(cnameRecord => {
+                return cnameRecord.valid
+              })) {
+                dns['CNAME'].valid = true
+              }
               break
             case 'DS':
-              dns['DS'] = (dnsResponse['DS'] as Array<DSAnswer>).map(dnsAnswer => {
+              dns['DS'].records = (dnsResponse['DS'] as Array<DSAnswer>).map(dsAnswer => {
                 return {
                   id: v4(),
-                  domain: dnsAnswer.name,
+                  domain: dsAnswer.name,
                   valid: false,
-                  value: dnsAnswer.type === 'DS' && dnsAnswer.data
+                  value: dsAnswer.type === 'DS' && dsAnswer.data
                 }
               })
+              if (dns['DS'].records.length === 0) {
+                dns['DS'].valid = true
+              }
               break
             case 'NS':
-              dns['NS'] = dnsResponse['NS']!.map(dnsAnswer => {
+              dns['NS'].records = dnsResponse['NS']!.map(nsAnswer => {
                 return {
                   id: v4(),
-                  domain: dnsAnswer.name,
-                  valid: dnsAnswer.type === 'NS' && /dns[1-4]\.p0[0-9]\.nsone\.net/.test(dnsAnswer.data as string),
-                  value: dnsAnswer.type === 'NS' && dnsAnswer.data as string
+                  domain: nsAnswer.name,
+                  valid: nsAnswer.type === 'NS' && /dns[1-4]\.p0[0-9]\.nsone\.net/.test(nsAnswer.data as string),
+                  value: nsAnswer.type === 'NS' && nsAnswer.data as string
                 }
               })
+              if (dns['NS'].records.length === 4 && dns['NS'].records.every(nsRecord => {
+                return nsRecord.valid
+              })) {
+                dns['NS'].valid = true
+              }
+              break
           }
         })
       })
+      if (dns['A'].valid && dns['AAAA'].valid && dns['NS'].valid && dns['CNAME'].records.length > 0) {
+        dns['CNAME'].valid = false
+      }
       reply.status(200).send(dns)
     })
   } else {

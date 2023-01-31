@@ -14,7 +14,11 @@
     text? : string
   }>(), {
     dns: () => {
-      return []
+      return {
+        records: [],
+        text: '',
+        valid: false
+      }
     },
     open: false,
     state: 'waiting',
@@ -117,14 +121,14 @@
         u-flex="~ col"
         u-gap="y-3"
         u-p="l-3 y-3"
-        v-if="collapseProps.dns.length > 0">
+        v-if="collapseProps.dns.records.length > 0">
         <div
           u-flex="~"
           u-gap="x-1"
           u-items="center"
           v-bind:key="record.id"
           v-bind:u-text="record.valid ? 'dark:dark-teal-300' : 'dark:dark-red-300'"
-          v-for="record in collapseProps.dns">
+          v-for="record in collapseProps.dns.records">
           <NIcon
             v-bind:name="record.valid ? 'circle-check' : 'circle-xmark'"/>
           <span>{{record.domain}}: {{record.value}}</span>

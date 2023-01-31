@@ -10,35 +10,83 @@
   let cardCNAMEOpen = $ref<boolean>(false)
   let cardDSOpen = $ref<boolean>(false)
   let cardNSOpen = $ref<boolean>(false)
-  let domainARecords = $ref<Exclude<DNSResponse['A'], undefined>>([])
+  let domainARecords = $ref<DNSResponse['A']>({
+    records: [],
+    text: '',
+    valid: false
+  })
   let domainAState = $ref<UICollapseState>('waiting')
-  let domainAAAARecords = $ref<Exclude<DNSResponse['AAAA'], undefined>>([])
+  let domainAAAARecords = $ref<DNSResponse['AAAA']>({
+    records: [],
+    text: '',
+    valid: false
+  })
   let domainAAAAState = $ref<UICollapseState>('waiting')
   let domainError = $ref<string>('')
-  let domainCAARecords = $ref<Exclude<DNSResponse['CAA'], undefined>>([])
+  let domainCAARecords = $ref<DNSResponse['CAA']>({
+    records: [],
+    text: '',
+    valid: false
+  })
   let domainCAAState = $ref<UICollapseState>('waiting')
   let domainCAAText = $ref<string>('')
-  let domainCNAMERecords = $ref<Exclude<DNSResponse['CNAME'], undefined>>([])
+  let domainCNAMERecords = $ref<DNSResponse['CNAME']>({
+    records: [],
+    text: '',
+    valid: false
+  })
   let domainCNAMEState = $ref<UICollapseState>('waiting')
-  let domainDSRecords = $ref<Exclude<DNSResponse['DS'], undefined>>([])
+  let domainDSRecords = $ref<DNSResponse['DS']>({
+    records: [],
+    text: '',
+    valid: false
+  })
   let domainDSState = $ref<UICollapseState>('waiting')
   let domainInput = $ref<string>('')
-  let domainNSRecords = $ref<Exclude<DNSResponse['NS'], undefined>>([])
+  let domainNSRecords = $ref<DNSResponse['NS']>({
+    records: [],
+    text: '',
+    valid: false
+  })
   let domainNSState = $ref<UICollapseState>('waiting')
   function checkDns() {
     domainError = ''
-    domainARecords = []
+    domainARecords = ({
+      records: [],
+      text: '',
+      valid: false
+    })
     domainAState = 'checking'
-    domainAAAARecords = []
+    domainAAAARecords = ({
+      records: [],
+      text: '',
+      valid: false
+    })
     domainAAAAState = 'checking'
-    domainCAARecords = []
+    domainCAARecords = ({
+      records: [],
+      text: '',
+      valid: false
+    })
     domainCAAState = 'checking'
-    domainCNAMERecords = []
+    domainCNAMERecords = ({
+      records: [],
+      text: '',
+      valid: false
+    })
     domainCNAMEState = 'checking'
     domainCAAText = ''
-    domainDSRecords = []
+    domainDSRecords = ({
+      records: [],
+      text: '',
+      valid: false
+    })
     domainDSState = 'checking'
-    domainNSRecords = []
+    domainNSRecords = ({
+      records: [],
+      text: '',
+      valid: false
+    })
     domainNSState = 'checking'
     axios({
       url: `/api/validate/${domainInput}`
@@ -46,48 +94,38 @@
       data : DNSResponse
     }) => {
       if (validationResponse.data.valid) {
-        domainARecords = validationResponse.data.A as Exclude<DNSResponse['A'], undefined>
-        domainAAAARecords = validationResponse.data.AAAA as Exclude<DNSResponse['AAAA'], undefined>
-        domainCAARecords = validationResponse.data.CAA as Exclude<DNSResponse['CAA'], undefined>
-        domainCNAMERecords = validationResponse.data.CNAME as Exclude<DNSResponse['CNAME'], undefined>
-        domainDSRecords = validationResponse.data.DS as Exclude<DNSResponse['DS'], undefined>
-        domainNSRecords = validationResponse.data.NS as Exclude<DNSResponse['NS'], undefined>
-        if (domainARecords.length > 0 && domainARecords.length < 3 && domainARecords.every(record => {
-          return record.valid
-        })) {
+        domainARecords = validationResponse.data.A
+        domainAAAARecords = validationResponse.data.AAAA
+        domainCAARecords = validationResponse.data.CAA
+        domainCNAMERecords = validationResponse.data.CNAME
+        domainDSRecords = validationResponse.data.DS
+        domainNSRecords = validationResponse.data.NS
+        if (domainARecords.valid) {
           domainAState = 'valid'
         } else {
           domainAState = 'invalid'
         }
-        if (domainARecords.length === 0 || (domainARecords.length < 3 && domainAAAARecords.every(record => {
-          return record.valid
-        }))) {
+        if (domainAAAARecords.valid) {
           domainAAAAState = 'valid'
         } else {
           domainAAAAState = 'invalid'
         }
-        if (domainCAARecords.length === 0 || domainCAARecords.every(record => {
-          return record.valid
-        })) {
+        if (domainCAARecords.valid) {
           domainCAAState = 'valid'
         } else {
           domainCAAState = 'invalid'
         }
-        if (domainCNAMERecords.length <= 1 && domainCNAMERecords.every(record => {
-          return record.valid
-        })) {
+        if (domainCNAMERecords.valid) {
           domainCNAMEState = 'valid'
         } else {
           domainCNAMEState = 'invalid'
         }
-        if (domainDSRecords.length === 0) {
+        if (domainDSRecords.valid) {
           domainDSState = 'valid'
         } else {
           domainDSState = 'invalid'
         }
-        if (domainNSRecords.length === 4 && domainNSRecords.every(record => {
-          return record.valid
-        })) {
+        if (domainNSRecords.valid) {
           domainNSState = 'valid'
         } else {
           domainNSState = 'invalid'
