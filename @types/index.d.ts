@@ -7,7 +7,6 @@ export type DNSResponse = {
       valid : boolean
       value : boolean | DigestData | string
     }>
-    text : string
     valid : boolean
   }
 } & {

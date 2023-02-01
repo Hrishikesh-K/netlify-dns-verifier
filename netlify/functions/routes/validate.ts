@@ -13,19 +13,20 @@ export default function (request : FastifyRequest<{
   const filteredSuffixes = suffixes.filter(suffix => {
     return request.params.domain.endsWith(`.${suffix}`)
   })
-  const actualSuffix = filteredSuffixes.reduce((currentLongestDomain, currentDomain) => {
-    if (currentLongestDomain.length > currentDomain.length) {
-      return currentLongestDomain
-    } else {
-      return currentDomain
-    }
-  }, '')
-  const apexDomain = request.params.domain.split('.').length - actualSuffix.split('.').length === 1
   if (filteredSuffixes.length > 0) {
+    const actualSuffix = filteredSuffixes.reduce((currentLongestDomain, currentDomain) => {
+      if (currentLongestDomain.length > currentDomain.length) {
+        return currentLongestDomain
+      } else {
+        return currentDomain
+      }
+    }, '')
+    const isApexDomain = request.params.domain.split('.').length - actualSuffix.split('.').length === 1
     return Promise.all(['A', 'AAAA', 'CAA', 'CNAME', 'DS', 'NS'].map(dnsClass => {
       if (dnsClass === 'CAA') {
-        return Promise.all(request.params.domain.replace(`.${actualSuffix}`, '').split('.').reduce((accumulatedArray, _partOfDomain, partOfDomainIndex, partOfDomainArray) => {
-          return accumulatedArray.concat([`${partOfDomainArray.slice(0, partOfDomainIndex + 1).join('.')}.${actualSuffix}`])
+        const apexDomain = request.params.domain.split('.').slice(-actualSuffix.split('.').length - 1).join('.')
+        return Promise.all(request.params.domain.replace(`.${apexDomain}`, '').split('.').reduce((accumulatedArray, _partOfDomain, partOfDomainIndex, partOfDomainArray) => {
+          return accumulatedArray.concat([`${partOfDomainArray.slice(0, partOfDomainIndex + 1).join('.')}.${apexDomain}`])
         }, [] as Array<string>).map(partOfApex => {
           return query({
             question: {
@@ -48,7 +49,7 @@ export default function (request : FastifyRequest<{
             CAA: []
           })
         })
-      } else if (!request.params.domain.startsWith('www.') && apexDomain && dnsClass === 'CNAME') {
+      } else if (!request.params.domain.startsWith('www.') && isApexDomain && dnsClass === 'CNAME') {
         return Promise.all([`www.${request.params.domain}`, request.params.domain].map(domain => {
           return query({
             question: {
@@ -89,32 +90,26 @@ export default function (request : FastifyRequest<{
       const dns : DNSResponse = {
         A: {
           records: [],
-          text: '',
           valid: false
         },
         AAAA: {
           records: [],
-          text: '',
           valid: false
         },
         CAA: {
           records: [],
-          text: '',
           valid: false
         },
         CNAME: {
           records: [],
-          text: '',
           valid: false
         },
         DS: {
           records: [],
-          text: '',
           valid: false
         },
         NS: {
           records: [],
-          text: '',
           valid: false
         },
         valid: true
@@ -176,9 +171,9 @@ export default function (request : FastifyRequest<{
                   value: cnameAnswer.type === 'CNAME' && cnameAnswer.data as string
                 }
               })
-              if (apexDomain && dns['CNAME'].records.length === 0) {
+              if (isApexDomain && dns['CNAME'].records.length === 0) {
                 dns['CNAME'].valid = true
-              } else if (!apexDomain && dns['CNAME'].records.length === 1 && dns['CNAME'].records.every(cnameRecord => {
+              } else if (!isApexDomain && dns['CNAME'].records.length === 1 && dns['CNAME'].records.every(cnameRecord => {
                 return cnameRecord.valid
               })) {
                 dns['CNAME'].valid = true
@@ -215,6 +210,11 @@ export default function (request : FastifyRequest<{
           }
         })
       })
+      if (dns['NS'].valid && dns['A'].records.some(aRecord => {
+        return aRecord.value === '75.2.60.5' || aRecord.value === '99.83.231.61'
+      })) {
+        dns['A'].valid = false
+      }
       if (dns['A'].valid && dns['AAAA'].valid && dns['NS'].valid && dns['CNAME'].records.length > 0) {
         dns['CNAME'].valid = false
       }

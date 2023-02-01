@@ -12,40 +12,34 @@
   let cardNSOpen = $ref<boolean>(false)
   let domainARecords = $ref<DNSResponse['A']>({
     records: [],
-    text: '',
     valid: false
   })
   let domainAState = $ref<UICollapseState>('waiting')
   let domainAAAARecords = $ref<DNSResponse['AAAA']>({
     records: [],
-    text: '',
     valid: false
   })
   let domainAAAAState = $ref<UICollapseState>('waiting')
   let domainError = $ref<string>('')
   let domainCAARecords = $ref<DNSResponse['CAA']>({
     records: [],
-    text: '',
     valid: false
   })
   let domainCAAState = $ref<UICollapseState>('waiting')
   let domainCAAText = $ref<string>('')
   let domainCNAMERecords = $ref<DNSResponse['CNAME']>({
     records: [],
-    text: '',
     valid: false
   })
   let domainCNAMEState = $ref<UICollapseState>('waiting')
   let domainDSRecords = $ref<DNSResponse['DS']>({
     records: [],
-    text: '',
     valid: false
   })
   let domainDSState = $ref<UICollapseState>('waiting')
   let domainInput = $ref<string>('')
   let domainNSRecords = $ref<DNSResponse['NS']>({
     records: [],
-    text: '',
     valid: false
   })
   let domainNSState = $ref<UICollapseState>('waiting')
@@ -53,38 +47,32 @@
     domainError = ''
     domainARecords = ({
       records: [],
-      text: '',
       valid: false
     })
     domainAState = 'checking'
     domainAAAARecords = ({
       records: [],
-      text: '',
       valid: false
     })
     domainAAAAState = 'checking'
     domainCAARecords = ({
       records: [],
-      text: '',
       valid: false
     })
     domainCAAState = 'checking'
     domainCNAMERecords = ({
       records: [],
-      text: '',
       valid: false
     })
     domainCNAMEState = 'checking'
     domainCAAText = ''
     domainDSRecords = ({
       records: [],
-      text: '',
       valid: false
     })
     domainDSState = 'checking'
     domainNSRecords = ({
       records: [],
-      text: '',
       valid: false
     })
     domainNSState = 'checking'
