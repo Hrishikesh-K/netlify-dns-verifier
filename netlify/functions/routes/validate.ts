@@ -1,6 +1,7 @@
 import type {Answer, CaaAnswer, DSAnswer, Packet} from '@leichtgewicht/dns-packet'
 import type {FastifyReply, FastifyRequest} from 'fastify'
 import type {DNSResponse} from '~/@types'
+import commandExists from 'command-exists'
 import {query} from 'dns-query'
 import {spawn} from 'child_process'
 import {v4} from 'uuid'
@@ -86,18 +87,26 @@ export default function (request : FastifyRequest<{
         }), new Promise<Array<Answer & {
           root : Boolean
         }>>(resolve => {
-          const dig = spawn('dig', ['NS', '+tries=1', '+trace', request.params.domain])
-          let digOutput = ''
-          dig.stdout.on('data', stdout => {
-            digOutput += stdout
-          })
-          dig.on('close', () => {
-            resolve([{
-              data: ((digOutput.trim().split('\n').slice(-1)[0] || '').match(/\(.*\)/) || [])[0]?.slice(1, -1) || '',
-              name: request.params.domain,
-              root: true,
-              type: 'NS'
-            }])
+          return commandExists('dig').then(digExists => {
+            let commandToExecute = ''
+            if (digExists) {
+              commandToExecute = 'dig'
+            } else {
+              commandToExecute = './data/bin/dig'
+            }
+            const dig = spawn(commandToExecute, ['NS', '+tries=1', '+trace', request.params.domain])
+            let digOutput = ''
+            dig.stdout.on('data', stdout => {
+              digOutput += stdout
+            })
+            dig.on('close', () => {
+              resolve([{
+                data: ((digOutput.trim().split('\n').slice(-1)[0] || '').match(/\(.*\)/) || [])[0]?.slice(1, -1) || '',
+                name: request.params.domain,
+                root: true,
+                type: 'NS'
+              }])
+            })
           })
         })]).then(nsResponses => {
           return {
@@ -266,3 +275,4 @@ export default function (request : FastifyRequest<{
     return
   }
 }
+// lucaubiali.it - CNAME shows invalid
