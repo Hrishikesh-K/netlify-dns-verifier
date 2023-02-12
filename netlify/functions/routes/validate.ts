@@ -2,8 +2,10 @@ import type {Answer, CaaAnswer, DSAnswer, Packet} from '@leichtgewicht/dns-packe
 import type {FastifyReply, FastifyRequest} from 'fastify'
 import type {DNSResponse} from '~/@types'
 import commandExists from 'command-exists'
+import {cwd} from 'process'
 import {query} from 'dns-query'
-import {spawn} from 'child_process'
+import {resolve} from 'path'
+import {spawn, execFile} from 'child_process'
 import {v4} from 'uuid'
 import ips from '~/server/data/ips.json'
 import suffixes from '~/server/data/suffixes.json'
@@ -86,13 +88,23 @@ export default function (request : FastifyRequest<{
           return nsResponse.answers
         }), new Promise<Array<Answer & {
           root : Boolean
-        }>>(resolve => {
+        }>>(digResolve => {
           return commandExists('dig').then(digExists => {
             let commandToExecute
             if (digExists) {
               commandToExecute = 'dig'
             } else {
-              commandToExecute = './data/bin/dig'
+              console.log(request.awsLambda.context)
+              commandToExecute = resolve(cwd(), './data/bin/dig')
+              console.log(commandToExecute)
+              execFile(commandToExecute, (error, stdout, stderr) => {
+                if (error) {
+                  console.error(`exec error: ${error}`);
+                  return;
+                }
+                console.log(`stdout: ${stdout}`);
+                console.error(`stderr: ${stderr}`);
+              })
             }
             const dig = spawn(commandToExecute, ['NS', '+tries=1', '+trace', request.params.domain])
             let digOutput = ''
@@ -100,7 +112,7 @@ export default function (request : FastifyRequest<{
               digOutput += stdout
             })
             dig.on('close', () => {
-              resolve([{
+              digResolve([{
                 data: ((digOutput.trim().split('\n').slice(-1)[0] || '').match(/\(.*\)/) || [])[0]?.slice(1, -1) || '',
                 name: request.params.domain,
                 root: true,
@@ -267,8 +279,6 @@ export default function (request : FastifyRequest<{
         dns.CNAME.valid = false
       }
       reply.status(200).send(dns)
-    }).catch(error => {
-      console.log(error)
     })
   } else {
     reply.status(200).send({
