@@ -4,6 +4,7 @@ import type {DNSResponse} from '~/@types'
 import {cwd} from 'process'
 import {query} from 'dns-query'
 import {exec, execFile} from 'child_process'
+import {readdirSync} from 'fs'
 import {resolve} from 'path'
 import {v4} from 'uuid'
 import ips from '~/server/data/ips.json'
@@ -95,7 +96,7 @@ export default function (request : FastifyRequest<{
               }
             })
           } else {
-            console.log(cwd())
+            console.log(readdirSync(cwd()))
             execFile(`${resolve(cwd(), './data/bin/dig')} NS +tries=1 +trace ${request.params.domain}`, (digExecFileError, digExecFileStdout, digExecFileStderr) => {
               if (digExecFileError || digExecFileStderr.length > 0) {
                 digReject()

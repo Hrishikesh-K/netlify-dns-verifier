@@ -20,7 +20,7 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
             stage: error.stage
           })
         } else {
-          console.log(error)
+          console.log(`error: ${error}`)
           reply.status(500).send({
             message: 'Failed to process request because of an unhandled error',
             request_id: request.awsLambda.context.awsRequestId,
