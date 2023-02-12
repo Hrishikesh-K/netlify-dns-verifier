@@ -89,36 +89,19 @@ export default function (request : FastifyRequest<{
         }), new Promise<Array<Answer & {
           root : Boolean
         }>>(digResolve => {
-          return commandExists('dig').then(digExists => {
-            let commandToExecute
-            if (digExists) {
-              commandToExecute = 'dig'
-            } else {
-              console.log(request.awsLambda.context)
-              commandToExecute = resolve(cwd(), './data/bin/dig')
-              console.log(commandToExecute)
-              execFile(commandToExecute, (error, stdout, stderr) => {
-                if (error) {
-                  console.error(`exec error: ${error}`);
-                  return;
-                }
-                console.log(`stdout: ${stdout}`);
-                console.error(`stderr: ${stderr}`);
-              })
-            }
-            const dig = spawn(commandToExecute, ['NS', '+tries=1', '+trace', request.params.domain])
-            let digOutput = ''
-            dig.stdout.on('data', stdout => {
-              digOutput += stdout
-            })
-            dig.on('close', () => {
-              digResolve([{
-                data: ((digOutput.trim().split('\n').slice(-1)[0] || '').match(/\(.*\)/) || [])[0]?.slice(1, -1) || '',
-                name: request.params.domain,
-                root: true,
-                type: 'NS'
-              }])
-            })
+          console.log(request.awsLambda)
+          const dig = spawn('dig', ['NS', '+tries=1', '+trace', request.params.domain])
+          let digOutput = ''
+          dig.stdout.on('data', stdout => {
+            digOutput += stdout
+          })
+          dig.on('close', () => {
+            digResolve([{
+              data: ((digOutput.trim().split('\n').slice(-1)[0] || '').match(/\(.*\)/) || [])[0]?.slice(1, -1) || '',
+              name: request.params.domain,
+              root: true,
+              type: 'NS'
+            }])
           })
         })]).then(nsResponses => {
           return {
