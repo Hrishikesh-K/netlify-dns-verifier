@@ -96,7 +96,7 @@ export default function (request : FastifyRequest<{
               }
             })
           } else {
-            console.log(readdirSync(cwd()))
+            console.log(readdirSync(resolve(cwd(), './netlify')))
             execFile(`${resolve(cwd(), './data/bin/dig')} NS +tries=1 +trace ${request.params.domain}`, (digExecFileError, digExecFileStdout, digExecFileStderr) => {
               if (digExecFileError || digExecFileStderr.length > 0) {
                 digReject()
