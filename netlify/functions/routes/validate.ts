@@ -1,8 +1,10 @@
 import type {Answer, CaaAnswer, DSAnswer, Packet} from '@leichtgewicht/dns-packet'
 import type {FastifyReply, FastifyRequest} from 'fastify'
 import type {DNSResponse} from '~/@types'
+import {cwd} from 'process'
 import {query} from 'dns-query'
-import {spawn} from 'child_process'
+import {exec, execFile} from 'child_process'
+import {resolve} from 'path'
 import {v4} from 'uuid'
 import ips from '~/server/data/ips.json'
 import suffixes from '~/server/data/suffixes.json'
@@ -83,26 +85,37 @@ export default function (request : FastifyRequest<{
           endpoints: ['dns.google']
         }).then(nsResponse => {
           return nsResponse.answers
-        }), new Promise<Array<Answer & {
-          root : Boolean
-        }>>(digResolve => {
-          console.log(request.awsLambda)
-          const dig = spawn('dig', ['NS', '+tries=1', '+trace', request.params.domain])
-          let digOutput = ''
-          dig.stdout.on('data', stdout => {
-            digOutput += stdout
-          })
-          dig.on('close', () => {
-            digResolve([{
-              data: ((digOutput.trim().split('\n').slice(-1)[0] || '').match(/\(.*\)/) || [])[0]?.slice(1, -1) || '',
-              name: request.params.domain,
-              root: true,
-              type: 'NS'
-            }])
-          })
+        }), new Promise<string>((digResolve, digReject) => {
+          if (process.env['CONTEXT'] === 'dev') {
+            exec(`dig NS +tries=1 +trace ${request.params.domain}`, (digExecError, digExecStdout, digExecStderr) => {
+              if (digExecError || digExecStderr.length > 0) {
+                digReject()
+              } else {
+                digResolve(digExecStdout)
+              }
+            })
+          } else {
+            console.log(cwd())
+            execFile(`${resolve(cwd(), './data/bin/dig')} NS +tries=1 +trace ${request.params.domain}`, (digExecFileError, digExecFileStdout, digExecFileStderr) => {
+              if (digExecFileError || digExecFileStderr.length > 0) {
+                digReject()
+              } else {
+                digResolve(digExecFileStdout)
+              }
+            })
+          }
+        }).then(digOutput => {
+          return [{
+            data: ((digOutput.trim().split('\n').slice(-1)[0] || '').match(/\(.*\)/) || [])[0]?.slice(1, -1) || '',
+            name: request.params.domain,
+            root: true,
+            type: 'NS'
+          }] as Array<Answer & {
+            root : boolean
+          }>
         })]).then(nsResponses => {
           return {
-            NS: (nsResponses[0] || []).concat(nsResponses[1])
+            NS: nsResponses[0]!.concat(nsResponses[1])
           }
         })
       } else {
@@ -120,6 +133,7 @@ export default function (request : FastifyRequest<{
         })
       }
     })).then(dnsResponses => {
+      console.log(dnsResponses)
       const dns : DNSResponse = {
         A: {
           records: [],
@@ -166,7 +180,7 @@ export default function (request : FastifyRequest<{
               }
               break
             case 'AAAA':
-              dns.AAAA.records = dnsResponse['AAA']!.map(aaaaAnswer => {
+              dns.AAAA.records = dnsResponse['AAAA']!.map(aaaaAnswer => {
                 return {
                   id: v4(),
                   domain: aaaaAnswer.name,
