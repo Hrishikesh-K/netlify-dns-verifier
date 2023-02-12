@@ -95,7 +95,7 @@ export default function (request : FastifyRequest<{
               }
             })
           } else {
-            execFile(`${resolve(cwd(), './netlify/functions/data/bin/dig')} NS +tries=1 +trace ${request.params.domain}`, (digExecFileError, digExecFileStdout, digExecFileStderr) => {
+            execFile(resolve(cwd(), './netlify/functions/data/bin/dig'), ['NS', '+tries=1', '+trace', request.params.domain], (digExecFileError, digExecFileStdout, digExecFileStderr) => {
               if (digExecFileError || digExecFileStderr.length > 0) {
                 console.log(digExecFileError)
                 digReject()
