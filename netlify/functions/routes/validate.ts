@@ -88,7 +88,7 @@ export default function (request : FastifyRequest<{
           root : Boolean
         }>>(resolve => {
           return commandExists('dig').then(digExists => {
-            let commandToExecute = ''
+            let commandToExecute
             if (digExists) {
               commandToExecute = 'dig'
             } else {
@@ -159,7 +159,7 @@ export default function (request : FastifyRequest<{
         Object.keys(dnsResponse).forEach(dnsClass => {
           switch (dnsClass) {
             case 'A':
-              dns['A'].records = dnsResponse[dnsClass]!.map(aAnswer => {
+              dns.A.records = dnsResponse['A']!.map(aAnswer => {
                 return {
                   id: v4(),
                   domain: aAnswer.name,
@@ -167,14 +167,14 @@ export default function (request : FastifyRequest<{
                   value: aAnswer.type === 'A' && aAnswer.data as string
                 }
               })
-              if (dns['A'].records.length > 0 && dns['A'].records.length < 3 && dns['A'].records.every(aRecord => {
+              if (dns.A.records.length > 0 && dns.A.records.length < 3 && dns.A.records.every(aRecord => {
                 return aRecord.valid
               })) {
-                dns['A'].valid = true
+                dns.A.valid = true
               }
               break
             case 'AAAA':
-              dns[dnsClass].records = dnsResponse[dnsClass]!.map(aaaaAnswer => {
+              dns.AAAA.records = dnsResponse['AAA']!.map(aaaaAnswer => {
                 return {
                   id: v4(),
                   domain: aaaaAnswer.name,
@@ -182,14 +182,14 @@ export default function (request : FastifyRequest<{
                   value: aaaaAnswer.type === 'AAAA' && aaaaAnswer.data as string
                 }
               })
-              if (dns['AAAA'].records.length === 0 || (dns['AAAA'].records.length < 3 && dns['AAAA'].records.every(aaaaRecord => {
+              if (dns.AAAA.records.length === 0 || (dns.AAAA.records.length < 3 && dns.AAAA.records.every(aaaaRecord => {
                 return aaaaRecord.valid
               }))) {
-                dns['AAAA'].valid = true
+                dns.AAAA.valid = true
               }
               break
             case 'CAA':
-              dns['CAA'].records = (dnsResponse['CAA'] as Array<CaaAnswer>).map(caaAnswer => {
+              dns.CAA.records = (dnsResponse['CAA'] as Array<CaaAnswer>).map(caaAnswer => {
                 return {
                   id: v4(),
                   domain: caaAnswer.name,
@@ -197,14 +197,14 @@ export default function (request : FastifyRequest<{
                   value: caaAnswer.type === 'CAA' && `${caaAnswer.data.flags} ${caaAnswer.data.tag} "${caaAnswer.data.value}"`
                 }
               })
-              if (dns['CAA'].records.length === 0 || dns['CAA'].records.some(caaRecord => {
+              if (dns.CAA.records.length === 0 || dns.CAA.records.some(caaRecord => {
                 return caaRecord.valid
               })) {
-                dns['CAA'].valid = true
+                dns.CAA.valid = true
               }
               break
             case 'CNAME':
-              dns['CNAME'].records = dnsResponse['CNAME']!.map(cnameAnswer => {
+              dns.CNAME.records = dnsResponse['CNAME']!.map(cnameAnswer => {
                 return {
                   id: v4(),
                   domain: cnameAnswer.name,
@@ -212,16 +212,16 @@ export default function (request : FastifyRequest<{
                   value: cnameAnswer.type === 'CNAME' && cnameAnswer.data as string
                 }
               })
-              if (isApexDomain && dns['CNAME'].records.length === 0) {
-                dns['CNAME'].valid = true
-              } else if (!isApexDomain && dns['CNAME'].records.length === 1 && dns['CNAME'].records.every(cnameRecord => {
+              if (isApexDomain && dns.CNAME.records.length === 0) {
+                dns.CNAME.valid = true
+              } else if (!isApexDomain && dns.CNAME.records.length === 1 && dns.CNAME.records.every(cnameRecord => {
                 return cnameRecord.valid
               })) {
-                dns['CNAME'].valid = true
+                dns.CNAME.valid = true
               }
               break
             case 'DS':
-              dns['DS'].records = (dnsResponse['DS'] as Array<DSAnswer>).map(dsAnswer => {
+              dns.DS.records = (dnsResponse['DS'] as Array<DSAnswer>).map(dsAnswer => {
                 return {
                   id: v4(),
                   domain: dsAnswer.name,
@@ -229,12 +229,12 @@ export default function (request : FastifyRequest<{
                   value: dsAnswer.type === 'DS' && dsAnswer.data
                 }
               })
-              if (dns['DS'].records.length === 0) {
-                dns['DS'].valid = true
+              if (dns.DS.records.length === 0) {
+                dns.DS.valid = true
               }
               break
             case 'NS':
-              dns['NS'].records = dnsResponse['NS']!.map((nsAnswer) => {
+              dns.NS.records = dnsResponse['NS']!.map((nsAnswer) => {
                 const nsReturnObject = {
                   id: v4(),
                   domain: nsAnswer.name,
@@ -249,24 +249,26 @@ export default function (request : FastifyRequest<{
                   return nsReturnObject
                 }
               })
-              if (dns['NS'].records.length === 5 && dns['NS'].records.every(nsRecord => {
+              if (dns.NS.records.length === 5 && dns.NS.records.every(nsRecord => {
                 return nsRecord.valid
               })) {
-                dns['NS'].valid = true
+                dns.NS.valid = true
               }
               break
           }
         })
       })
-      if (dns['NS'].valid && dns['A'].records.some(aRecord => {
+      if (dns.NS.valid && dns.A.records.some(aRecord => {
         return aRecord.value === '75.2.60.5' || aRecord.value === '99.83.231.61'
       })) {
-        dns['A'].valid = false
+        dns.A.valid = false
       }
-      if (dns['A'].valid && dns['AAAA'].valid && dns['NS'].valid && dns['CNAME'].records.length > 0) {
-        dns['CNAME'].valid = false
+      if (dns.A.valid && dns.AAAA.valid && dns.NS.valid && dns.CNAME.records.length > 0) {
+        dns.CNAME.valid = false
       }
       reply.status(200).send(dns)
+    }).catch(error => {
+      console.log(error)
     })
   } else {
     reply.status(200).send({
