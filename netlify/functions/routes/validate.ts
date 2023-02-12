@@ -1,7 +1,8 @@
-import type {CaaAnswer, DSAnswer, Packet} from '@leichtgewicht/dns-packet'
+import type {Answer, CaaAnswer, DSAnswer, Packet} from '@leichtgewicht/dns-packet'
 import type {FastifyReply, FastifyRequest} from 'fastify'
 import type {DNSResponse} from '~/@types'
 import {query} from 'dns-query'
+import {spawn} from 'child_process'
 import {v4} from 'uuid'
 import ips from '~/server/data/ips.json'
 import suffixes from '~/server/data/suffixes.json'
@@ -71,6 +72,37 @@ export default function (request : FastifyRequest<{
           }, {
             CNAME: []
           })
+        })
+      } else if (dnsClass === 'NS') {
+        return Promise.all([query({
+          question: {
+            name: request.params.domain,
+            type: 'NS'
+          }
+        }, {
+          endpoints: ['dns.google']
+        }).then(nsResponse => {
+          return nsResponse.answers
+        }), new Promise<Array<Answer & {
+          root : Boolean
+        }>>(resolve => {
+          const dig = spawn('dig', ['NS', '+tries=1', '+trace', request.params.domain])
+          let digOutput = ''
+          dig.stdout.on('data', stdout => {
+            digOutput += stdout
+          })
+          dig.on('close', () => {
+            resolve([{
+              data: ((digOutput.trim().split('\n').slice(-1)[0] || '').match(/\(.*\)/) || [])[0]?.slice(1, -1) || '',
+              name: request.params.domain,
+              root: true,
+              type: 'NS'
+            }])
+          })
+        })]).then(nsResponses => {
+          return {
+            NS: (nsResponses[0] || []).concat(nsResponses[1])
+          }
         })
       } else {
         return query({
@@ -193,15 +225,22 @@ export default function (request : FastifyRequest<{
               }
               break
             case 'NS':
-              dns['NS'].records = dnsResponse['NS']!.map(nsAnswer => {
-                return {
+              dns['NS'].records = dnsResponse['NS']!.map((nsAnswer) => {
+                const nsReturnObject = {
                   id: v4(),
                   domain: nsAnswer.name,
                   valid: nsAnswer.type === 'NS' && /dns[1-4]\.p0[0-9]\.nsone\.net/.test(nsAnswer.data as string),
                   value: nsAnswer.type === 'NS' && nsAnswer.data as string
                 }
+                // @ts-ignore
+                if (nsAnswer.root) {
+                  nsReturnObject.value = `from: ${nsAnswer.data}`
+                  return nsReturnObject
+                } else {
+                  return nsReturnObject
+                }
               })
-              if (dns['NS'].records.length === 4 && dns['NS'].records.every(nsRecord => {
+              if (dns['NS'].records.length === 5 && dns['NS'].records.every(nsRecord => {
                 return nsRecord.valid
               })) {
                 dns['NS'].valid = true
