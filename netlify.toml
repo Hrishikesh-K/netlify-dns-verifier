@@ -4,9 +4,7 @@
 [dev]
   command = "npm run dev"
   targetPort = 5173
-[functions]
-  [functions."api"]
-    included_files = ["./netlify/functions/data/bin/**"]
+#[functions]
   #[functions."scheduled-update-db"]
     #schedule = "@daily"
 [[plugins]]

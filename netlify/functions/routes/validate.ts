@@ -1,6 +1,7 @@
-import type {CaaAnswer, DSAnswer, Packet} from '@leichtgewicht/dns-packet'
+import type {Answer, CaaAnswer, DSAnswer, Packet} from '@leichtgewicht/dns-packet'
 import type {FastifyReply, FastifyRequest} from 'fastify'
 import type {DNSResponse} from '~/@types'
+import axios from 'axios'
 import {query} from 'dns-query'
 import {v4} from 'uuid'
 import ips from '~/server/data/ips.json'
@@ -82,9 +83,43 @@ export default function (request : FastifyRequest<{
           endpoints: ['dns.google']
         }).then(nsResponse => {
           return nsResponse.answers
+        }), axios({
+          params: {
+            type: 'NS'
+          },
+          responseType: 'text',
+          url: `https://rst.im/dig/${request.params.domain}/8.8.8.8/noshort/trace/`
+        }).then((nsTraceResponse : {
+          data : string
+        }) => {
+          const digReturnData : Array<Answer & {
+            root : boolean
+          }> = [{
+            data: '',
+            name: request.params.domain,
+            root: true,
+            type: 'NS'
+          }]
+          const dataWithinCodeBlock = nsTraceResponse.data.trim().match(/^<pre><code>([\S\s]*?)<\/code><\/pre>/m)
+          if (dataWithinCodeBlock) {
+            const lastDigLine = dataWithinCodeBlock[0].trim().split('\n').slice(-3, -2)[0]
+            if (lastDigLine) {
+              const answerFromLine = lastDigLine.trim().match(/\(.*\)/)
+              if (answerFromLine) {
+                digReturnData[0]!.data = answerFromLine[0].slice(1, -1)
+                return digReturnData
+              } else {
+                return digReturnData
+              }
+            } else {
+              return digReturnData
+            }
+          } else {
+            return digReturnData
+          }
         })]).then(nsResponses => {
           return {
-            NS: nsResponses[0]!
+            NS: nsResponses[0]!.concat(nsResponses[1])
           }
         })
       } else {
@@ -102,7 +137,6 @@ export default function (request : FastifyRequest<{
         })
       }
     })).then(dnsResponses => {
-      console.log(dnsResponses)
       const dns : DNSResponse = {
         A: {
           records: [],
@@ -250,4 +284,3 @@ export default function (request : FastifyRequest<{
     return
   }
 }
-// lucaubiali.it - CNAME shows invalid

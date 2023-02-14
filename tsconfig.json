@@ -30,7 +30,7 @@
     "removeComments": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "sourceMap": true,
+    "sourceMap": false,
     "strict": true,
     "target": "ESNext",
     "typeRoots": ["./@types", "./node_modules/@types"]
