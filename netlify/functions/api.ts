@@ -1,6 +1,5 @@
 import type {CaaAnswer, Packet} from '@leichtgewicht/dns-packet'
 import type {HandlerContext, HandlerEvent} from '@netlify/functions'
-import type {RouteOptions} from 'fastify'
 import type {DNSResponse} from '~/@types'
 import awsLambdaFastify from '@fastify/aws-lambda'
 import fastify, {FastifyReply, FastifyRequest} from 'fastify'
@@ -16,45 +15,20 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
     ignoreDuplicateSlashes: true
   })
   api.register((app, _options, done) => {
-    const commonRouteOptions : RouteOptions = {
+    app.route({
       attachValidation: true,
       errorHandler: (error, request, reply) => {
+        const errorResponse = {
+          message: 'Failed to process request because of an unhandled error',
+          request_id: request.awsLambda.context.awsRequestId
+        }
         if (error instanceof ApiError) {
-          reply.status(error.status).send({
-            message: error.message,
-            request_id: request.awsLambda.context.awsRequestId
-          })
+          errorResponse.message = error.message
+          reply.status(error.status).send(errorResponse)
         } else {
-          reply.status(500).send({
-            message: 'Failed to process request because of an unhandled error',
-            request_id: request.awsLambda.context.awsRequestId
-          })
+          reply.status(500).send(errorResponse)
         }
       },
-      handler: () => {},
-      method: 'GET',
-      preHandler: (request, _reply, next) => {
-        if (request.validationError) {
-          throw new ApiError('Failed to process request because it contains invalid data', 'params_validation', 400)
-        } else {
-          next()
-        }
-      },
-      schema: {
-        params: {
-          properties: {
-            domain: {
-              pattern: '^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$',
-              type: 'string'
-            }
-          },
-          type: 'object'
-        }
-      },
-      url: ''
-    }
-    app.route({
-      ...commonRouteOptions,
       handler(request : FastifyRequest<{
         Params : {
           domain : string
@@ -71,8 +45,10 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
               return currentDomain
             }
           }, '')
-          const isApexDomain = request.params.domain.split('.').length - actualSuffix.split('.').length === 1
           const dnsClasses = ['A', 'AAAA', 'CAA', 'CNAME', 'DS', 'NS']
+          function isApexDomain(domain : string) {
+            return domain.split('.').length - actualSuffix.split('.').length === 1
+          }
           return Promise.all(dnsClasses.map(dnsClass => {
             if (dnsClass === 'CAA') {
               const apexDomain = request.params.domain.split('.').slice(-actualSuffix.split('.').length - 1).join('.')
@@ -100,7 +76,7 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
                   CAA: []
                 })
               })
-            } else if (!request.params.domain.startsWith('www.') && isApexDomain && dnsClass === 'CNAME') {
+            } else if (dnsClass === 'CNAME' && !request.params.domain.startsWith('www.') && isApexDomain(request.params.domain)) {
               return Promise.all([`www.${request.params.domain}`, request.params.domain].map(domain => {
                 return query({
                   question: {
@@ -224,22 +200,13 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
                           value: ''
                         }
                         if (aAnswer.type === 'A') {
-                          aReturn.valid = ips.includes(aAnswer.data as string)
-                          aReturn.value = aAnswer.data as string
+                          aReturn.valid = ips.includes(aAnswer.data)
+                          aReturn.value = aAnswer.data
                         } else {
                           aReturn.value = `Received ${aAnswer.type} response with the value ${aAnswer.data}`
                         }
                         return aReturn
                       })
-                      if (dns.A.records.length === 1) {
-                        if (dns.A.records[0]!.value === '75.2.60.5' || dns.A.records[0]!.value === process.env['NETLIFY_HP_LB']) {
-                          dns.A.valid = true
-                        }
-                      } else if (dns.A.records.length === 2 && dns.A.records.every(aRecord => {
-                        return aRecord.valid
-                      })) {
-                        dns.A.valid = true
-                      }
                     }
                     break
                   case 'AAAA':
@@ -252,18 +219,13 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
                           value: ''
                         }
                         if (aaaaAnswer.type === 'AAAA') {
-                          aaaaReturn.valid = ips.includes(aaaaAnswer.data as string)
-                          aaaaReturn.value = aaaaAnswer.data as string
+                          aaaaReturn.valid = ips.includes(aaaaAnswer.data)
+                          aaaaReturn.value = aaaaAnswer.data
                         } else {
                           aaaaReturn.value = `Received ${aaaaAnswer.type} response with the value ${aaaaAnswer.data}`
                         }
                         return aaaaReturn
                       })
-                      if (dns.AAAA.records.length === 0 || (dns.AAAA.records.length === 2 && dns.AAAA.records.every(aaaaRecord => {
-                        return aaaaRecord.valid
-                      }))) {
-                        dns.AAAA.valid = true
-                      }
                     }
                     break
                   case 'CAA':
@@ -283,11 +245,9 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
                         }
                         return caaReturn
                       })
-                      if (dns.CAA.records.length === 0 || dns.CAA.records.some(caaRecord => {
+                      dns.CAA.valid = dns.CAA.records.length === 0 || dns.CAA.records.some(caaRecord => {
                         return caaRecord.valid
-                      })) {
-                        dns.CAA.valid = true
-                      }
+                      })
                     }
                     break
                   case 'CNAME':
@@ -300,22 +260,13 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
                           value: ''
                         }
                         if (cnameAnswer.type === 'CNAME') {
-                          cnameReturn.valid = (cnameAnswer.data as string).endsWith('netlify.app') || (cnameAnswer.data as string).endsWith(process.env['NETLIFY_HP_CNAME'] || '')
-                          cnameReturn.value = cnameAnswer.data as string
+                          cnameReturn.valid = !isApexDomain(cnameAnswer.name) && (cnameAnswer.data.endsWith('netlify.app') || cnameAnswer.data.endsWith(process.env['NETLIFY_HP_CNAME'] || ''))
+                          cnameReturn.value = cnameAnswer.data
                         } else {
                           cnameReturn.value = `Received ${cnameAnswer.type} response with the value ${cnameAnswer.data}`
                         }
                         return cnameReturn
                       })
-                      if (isApexDomain) {
-                        if (dns.CNAME.records.length === 0) {
-                          dns.CNAME.valid = true
-                        }
-                      } else if (dns.CNAME.records.length === 1 && dns.CNAME.records.every(cnameRecord => {
-                        return cnameRecord.valid
-                      })) {
-                        dns.CNAME.valid = true
-                      }
                     }
                     break
                   case 'DS':
@@ -328,16 +279,13 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
                           value: ''
                         }
                         if (dsAnswer.type === 'DS') {
-                          dsReturn.value && dsAnswer.data
-                          console.log(dsReturn.value)
+                          dsReturn.value = dsAnswer.data
                         } else {
                           dsReturn.value = `Received ${dsAnswer.type} response with the value ${dsAnswer.data}`
                         }
                         return dsReturn
                       })
-                      if (dns.DS.records.length === 0) {
-                        dns.DS.valid = true
-                      }
+                      dns.DS.valid = dns.DS.records.length === 0
                     }
                     break
                   case 'NS':
@@ -350,10 +298,11 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
                           value: ''
                         }
                         if (nsAnswer.type === 'NS') {
-                          if ((nsAnswer.data as string).startsWith('from: ')) {
-                            nsReturn.valid = /dns[1-4]\.p0[0-9]\.nsone\.net/.test(nsAnswer.data.slice(6))
+                          const nsRegEx = /dns[1-4]\.p0[0-9]\.nsone\.net/
+                          if (nsAnswer.data.startsWith('from: ')) {
+                            nsReturn.valid = nsRegEx.test(nsAnswer.data.slice(6))
                           } else {
-                            nsReturn.valid = /dns[1-4]\.p0[0-9]\.nsone\.net/.test(nsAnswer.data)
+                            nsReturn.valid = nsRegEx.test(nsAnswer.data)
                           }
                           nsReturn.value = nsAnswer.data
                         } else {
@@ -361,23 +310,32 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
                         }
                         return nsReturn
                       })
-                      if (dns.NS.records.length === 5 && dns.NS.records.every(nsRecord => {
+                      dns.NS.valid = dns.NS.records.length === 5 && dns.NS.records.every(nsRecord => {
                         return nsRecord.valid
-                      })) {
-                        dns.NS.valid = true
-                      }
+                      })
                     }
                     break
                 }
               })
             })
-            if (dns.NS.valid && dns.A.records.some(aRecord => {
-              return aRecord.value === '75.2.60.5' || aRecord.value === '99.83.231.61' || aRecord.value === process.env['NETLIFY_HP_LB']
-            })) {
-              dns.A.valid = false
-            }
-            if (dns.A.valid && dns.AAAA.valid && dns.NS.valid && dns.CNAME.records.length > 0) {
-              dns.CNAME.valid = false
+            if (dns.NS.valid) {
+              dns.A.valid = dns.A.records.length === 2 && dns.A.records.every(aRecord => {
+                return aRecord.valid
+              })
+              dns.AAAA.valid = dns.AAAA.records.length === 0 || (dns.AAAA.records.length === 2 && dns.AAAA.records.every(aaaaRecord => {
+                return aaaaRecord.valid
+              }))
+              dns.CNAME.valid = dns.CNAME.records.length === 0
+            } else {
+              if (dns.A.records.length === 1) {
+                dns.A.valid = dns.A.records[0] && (dns.A.records[0].value === '75.2.60.5' || dns.A.records[0].value === process.env['NETLIFY_HP_LB']) || false
+              } else if (dns.A.records.length === 2) {
+                dns.A.valid = dns.A.records.every(aRecord => {
+                  return aRecord.value === '75.2.60.5' || aRecord.value === '99.83.231.61'
+                })
+              }
+              dns.AAAA.valid = dns.AAAA.records.length === 0
+              dns.CNAME.valid = dns.CNAME.records.length === 1 && dns.CNAME.records[0] && dns.CNAME.records[0].valid || false
             }
             reply.status(200).send(dns)
           })
@@ -386,6 +344,25 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
             valid: false
           })
           return
+        }
+      },
+      method: 'GET',
+      preHandler: (request, _reply, next) => {
+        if (request.validationError) {
+          throw new ApiError('Failed to process request because it contains invalid data', 400)
+        } else {
+          next()
+        }
+      },
+      schema: {
+        params: {
+          properties: {
+            domain: {
+              pattern: '^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$',
+              type: 'string'
+            }
+          },
+          type: 'object'
         }
       },
       url: '/validate/:domain'
