@@ -5,5 +5,6 @@ declare module 'fastify' {
       context : HandlerContext
       event : HandlerEvent
     }
+    requestTimer : NodeJS.Timer
   }
 }
