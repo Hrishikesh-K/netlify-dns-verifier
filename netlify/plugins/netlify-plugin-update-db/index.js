@@ -38,10 +38,12 @@ async function updateFiles(plugin) {
       url: 'https://publicsuffix.org/list/public_suffix_list.dat'
     }).then(listResponse => {
       writeFileSync(suffixesPath, JSON.stringify(listResponse.data.split('\n').filter(line => {
-        if (line.startsWith('*.')) {
-          return line.slice(2)
+        return line.length > 0 && !line.startsWith('//')
+      }).map(filteredLine => {
+        if (filteredLine.startsWith('*.')) {
+          return filteredLine.slice(2)
         } else {
-          return line.length > 0 && !line.startsWith('//')
+          return filteredLine
         }
       })))
       console.log('Suffixes updated')
