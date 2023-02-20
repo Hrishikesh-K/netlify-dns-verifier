@@ -280,9 +280,13 @@ export async function handler(event : HandlerEvent, context : HandlerContext) {
                           }
                           return nsReturn
                         })
-                        dns.NS.valid = dns.NS.records.length === 5 && dns.NS.records.every(nsRecord => {
-                          return nsRecord.valid
-                        })
+                        if (domainsToCheck.length === 2 && domainToCheck.startsWith('www.')) {
+                          dns.NS.valid = dns.NS.records.length === 1 && dns.NS.records[0] && dns.NS.records[0].valid || false
+                        } else {
+                          dns.NS.valid = dns.NS.records.length === 5 && dns.NS.records.every(nsRecord => {
+                            return nsRecord.valid
+                          })
+                        }
                       }
                       break
                   }
